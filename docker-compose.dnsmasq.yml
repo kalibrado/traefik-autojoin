@@ -1,0 +1,27 @@
+services:
+  dnsmasq:
+    image: dockurr/dnsmasq
+    container_name: dnsmasq
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    configs:
+      - source: dnsmasq_conf
+        target: /etc/dnsmasq.conf
+
+configs:
+  dnsmasq_conf:
+    content: |
+      no-resolv
+      server=1.1.1.1
+      server=9.9.9.9
+      bind-interfaces
+      listen-address=${DNSMASQ_LISTEN_ADDRESS:-192.168.1.5}
+
+      # Une ligne par nom d'application et par IP de machine Docker.
+      # Remplacez les exemples ci-dessous par votre infrastructure.
+      address=/traefik.local/${TRAEFIK_HOST_IP:-192.168.1.113}
+      address=/dev.local/${DEV_HOST_IP:-192.168.1.43}
+      address=/test.local/${TEST_HOST_IP:-192.168.1.42}
+      address=/kasm.local/${KASM_HOST_IP:-192.168.1.5}

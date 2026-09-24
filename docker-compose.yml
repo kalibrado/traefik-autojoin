@@ -1,0 +1,50 @@
+
+
+services:
+  traefik:
+    image: traefik:v3
+    container_name: traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "8181:8080" 
+    command:
+      - --entrypoints.web.address=:80
+      - --providers.docker=true
+      - --providers.docker.network=proxy
+      - --providers.docker.exposedByDefault=true
+      - '--providers.docker.defaultRule=Host(`{{ if index .Labels "com.docker.compose.service" }}{{ index .Labels "com.docker.compose.service" }}{{ else }}{{ normalize .Name }}{{ end }}.${DOMAIN:-local}`)'
+      - --api.dashboard=true
+      - --api.insecure=true
+      - --log.level=INFO
+      - --accesslog=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - traefik.http.routers.dashboard.rule=Host(`traefik.${DOMAIN:-local}`)
+      - traefik.http.routers.dashboard.service=api@internal
+    networks:
+      - proxy
+  traefik-autojoin:
+    image: docker:cli
+    container_name: traefik-autojoin
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        join() {
+          for n in $$(docker network ls --filter driver=bridge --format '{{.Name}}'); do
+            case "$$n" in bridge|host|none|proxy) continue;; esac
+            docker network connect "$$n" traefik 2>/dev/null
+          done
+        }
+        join
+        docker events \
+          --filter type=network --filter event=create \
+          --filter type=container --filter event=start \
+          --format '{{.Type}}' | while read -r _; do join; done
+networks:
+  proxy:
+    name: proxy
